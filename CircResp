@@ -1,1 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alveoli & Capillary Gas Exchange Simulation</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --o2: #ef4444;
+    --co2: #3b82f6;
+    --accent: #0f172a;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+  body {
+    margin: 0;
+    padding: 20px;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    max-width: 960px;
+    width: 100%;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    padding: 24px;
+    border: 1px solid var(--border);
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  h1 { margin: 0; font-size: 1.4rem; color: var(--accent); }
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .dot.o2 { background: var(--o2); }
+  .dot.co2 { background: var(--co2); }
+  
+  .sim-area {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    background: #fff5f5;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+    background: #f8fafc;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .control-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: #2563eb;
+  }
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  button {
+    flex: 1;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.15s;
+    font-size: 0.9rem;
+  }
+  .btn-rest { background: #e2e8f0; color: #1e293b; }
+  .btn-rest.active { background: #0284c7; color: white; }
+  .btn-exercise { background: #e2e8f0; color: #1e293b; }
+  .btn-exercise.active { background: #dc2626; color: white; }
+  
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .stat-card {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-title { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+  .stat-val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; color: var(--accent); }
+  .info-box {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #334155;
+    background: #eff6ff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+  }
+</style>
+</head>
+<body>
 
+<div class="container">
+  <header>
+    <h1>Gas Exchange: Alveoli &amp; Capillary Simulation</h1>
+    <div class="legend">
+      <span><i class="dot o2"></i> Oxygen (O₂)</span>
+      <span><i class="dot co2"></i> Carbon Dioxide (CO₂)</span>
+    </div>
+  </header>
+
+  <div class="sim-area">
+    <canvas id="simCanvas" width="900" height="420"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>
+        <span>Breathing Rate</span>
+        <span id="breathVal">14 breaths/min</span>
+      </label>
+      <input type="range" id="breathSlider" min="6" max="40" value="14">
+    </div>
+
+    <div class="control-group">
+      <label>
+        <span>Heart Rate (Blood Flow)</span>
+        <span id="heartVal">70 BPM</span>
+      </label>
+      <input type="range" id="heartSlider" min="40" max="180" value="70">
+    </div>
+
+    <div class="control-group">
+      <label><span>Activity Preset</span></label>
+      <div class="btn-group">
+        <button id="restBtn" class="btn-rest active">Resting</button>
+        <button id="exerciseBtn" class="btn-exercise">Exercise Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-title">Alveolus O₂ Level</div>
+      <div class="stat-val" id="alvO2Stat">High</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Leaving Blood O₂ Saturation</div>
+      <div class="stat-val" id="bloodO2Stat">98%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">CO₂ Removed from Blood</div>
+      <div class="stat-val" id="co2RemovedStat">Normal</div>
+    </div>
+  </div>
+
+  <div class="info-box" id="statusText">
+    <strong>How it works:</strong> Deoxygenated blood (carrying CO₂ from body cells) enters the capillary on the left. Because O₂ concentration is higher inside the alveolus, oxygen diffuses across the thin membrane into red blood cells. At the same time, CO₂ diffuses from the blood into the alveolus to be exhaled.
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+const breathSlider = document.getElementById('breathSlider');
+const heartSlider = document.getElementById('heartSlider');
+const breathVal = document.getElementById('breathVal');
+const heartVal = document.getElementById('heartVal');
+const restBtn = document.getElementById('restBtn');
+const exerciseBtn = document.getElementById('exerciseBtn');
+
+const alvO2Stat = document.getElementById('alvO2Stat');
+const bloodO2Stat = document.getElementById('bloodO2Stat');
+const co2RemovedStat = document.getElementById('co2RemovedStat');
+
+let breathingRate = 14;
+let heartRate = 70;
+let isExercise = false;
+let breathPhase = 0;
+
+// Geometry constants
+const ALV_X = 450;
+const ALV_Y = 145;
+const ALV_BASE_R = 115;
+const CAP_TOP = 285;
+const CAP_BOTTOM = 385;
+
+// Particles
+let alvO2 = [];
+let alvCO2 = [];
+let rbcs = [];
+let freeCO2 = [];
+
+function initSimulation() {
+  alvO2 = [];
+  alvCO2 = [];
+  rbcs = [];
+  freeCO2 = [];
+
+  for (let i = 0; i < 32; i++) {
+    alvO2.push(createAlvParticle('o2'));
+  }
+
+  for (let i = 0; i < 7; i++) {
+    spawnRBC(i * 140);
+  }
+}
+
+function createAlvParticle(type) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.random() * (ALV_BASE_R - 25);
+  return {
+    type,
+    x: ALV_X + Math.cos(angle) * dist,
+    y: ALV_Y + Math.sin(angle) * dist,
+    vx: (Math.random() - 0.5) * 2.5,
+    vy: (Math.random() - 0.5) * 2.5
+  };
+}
+
+function spawnRBC(xPos = -50) {
+  const co2Count = isExercise ? 4 : 2;
+  const slots = [];
+  for (let i = 0; i < 4; i++) {
+    slots.push(i < co2Count ? 'co2' : 'empty');
+  }
+  rbcs.push({
+    x: xPos,
+    y: (CAP_TOP + CAP_BOTTOM) / 2 + (Math.random() - 0.5) * 22,
+    r: 24,
+    slots: slots // 4 binding sites per Red Blood Cell
+  });
+}
+
+// Controls listeners
+breathSlider.addEventListener('input', (e) => {
+  breathingRate = parseInt(e.target.value);
+  breathVal.textContent = `${breathingRate} breaths/min`;
+  updateModeButtons();
+});
+
+heartSlider.addEventListener('input', (e) => {
+  heartRate = parseInt(e.target.value);
+  heartVal.textContent = `${heartRate} BPM`;
+  updateModeButtons();
+});
+
+restBtn.addEventListener('click', () => {
+  isExercise = false;
+  breathingRate = 14;
+  heartRate = 70;
+  breathSlider.value = 14;
+  heartSlider.value = 70;
+  breathVal.textContent = `14 breaths/min`;
+  heartVal.textContent = `70 BPM`;
+  restBtn.classList.add('active');
+  exerciseBtn.classList.remove('active');
+});
+
+exerciseBtn.addEventListener('click', () => {
+  isExercise = true;
+  breathingRate = 32;
+  heartRate = 150;
+  breathSlider.value = 32;
+  heartSlider.value = 150;
+  breathVal.textContent = `32 breaths/min`;
+  heartVal.textContent = `150 BPM`;
+  exerciseBtn.classList.add('active');
+  restBtn.classList.remove('active');
+});
+
+function updateModeButtons() {
+  if (breathingRate >= 25 || heartRate >= 120) {
+    isExercise = true;
+    exerciseBtn.classList.add('active');
+    restBtn.classList.remove('active');
+  } else {
+    isExercise = false;
+    restBtn.classList.add('active');
+    exerciseBtn.classList.remove('active');
+  }
+}
+
+let lastTime = 0;
+let rbcSpawnTimer = 0;
+let o2ReplenishTimer = 0;
+
+function update(dt) {
+  // Breathing expansion/contraction
+  const breathFreq = (breathingRate / 60) * Math.PI * 2;
+  const prevSin = Math.sin(breathPhase);
+  breathPhase += breathFreq * dt;
+  const currentSin = Math.sin(breathPhase);
+  const currentR = ALV_BASE_R + currentSin * 14;
+
+  // Exhale clears CO2 from alveolus; Inhale adds fresh O2
+  if (prevSin > 0 && currentSin <= 0) {
+    // Exhaling peak -> remove CO2
+    alvCO2 = alvCO2.slice(0, Math.max(0, alvCO2.length - 8));
+  }
+  if (prevSin < 0 && currentSin >= 0) {
+    // Inhaling -> replenish O2 based on breathing rate
+    const targetO2 = Math.min(48, Math.floor(18 + breathingRate * 0.8));
+    while (alvO2.length < targetO2) {
+      alvO2.push(createAlvParticle('o2'));
+    }
+  }
+
+  // Update Alveolus O2 molecules
+  for (let i = alvO2.length - 1; i >= 0; i--) {
+    let p = alvO2[i];
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Bounce off alveolus wall
+    const dx = p.x - ALV_X;
+    const dy = p.y - ALV_Y;
+    const dist = Math.hypot(dx, dy);
+
+    // Check diffusion zone at bottom of alveolus (near capillary)
+    const inExchangeZone = (p.y > ALV_Y + currentR - 22) && (Math.abs(p.x - ALV_X) < 95);
+
+    if (inExchangeZone) {
+      // Find nearby RBC with an empty or CO2 slot
+      let targetRBC = rbcs.find(r => Math.abs(r.x - p.x) < 45 && r.slots.includes('empty'));
